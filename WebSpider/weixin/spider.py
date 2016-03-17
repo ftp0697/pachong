@@ -10,6 +10,7 @@ import shutil
 import bos_conf
 import uuid
 import json
+import base64
 from baidubce.services.bos.bos_client import BosClient
 
 bucket_name = 'didiweixuetestpublic'
@@ -52,7 +53,7 @@ def saveImgs(images, name):
     if not bos_client.does_bucket_exist(bucket_name):
         __logger.debug("未查询到bucket：%s ", bucket_name)
         exit()
-    print u"发现", name, u"共有", len(images), u"张照片"
+    # print u"发现", name, u"共有", len(images), u"张照片"
     for imageURL in images:
         splitPath = imageURL.split('.')
         fTail = splitPath.pop()
@@ -73,12 +74,14 @@ def saveImg(imageURL, fileName,bos_client):
 
     # f = open(fileName, 'wb')
     # f.write(data)
-    print u"正在悄悄保存她的一张图片为", fileName
+    # print u"正在悄悄保存她的一张图片为", fileName
     # f.close()
 
 def spider(weixin):
-    url=weixin.Htmlurl
-    url = '''http://mp.weixin.qq.com/s?__biz=MzA4MzUwNzExMg==&mid=204458088&idx=1&sn=3e72b6b064232240aab4bc9ef445906d&scene=1&srcid=09113ERW3oEqdtsufsLYReMn&key=dffc561732c22651bd637924993cc98b75333cf022692f52bdf57d84d329163241da8609c9f08bf7c88ff0cf6f5a055e&ascene=1&uin=MTc1Njg2MDIyMQ%3D%3D&devicetype=webwx&version=70000001&pass_ticket=r5bIjsrbkVWvxNarrNxcFDsUgl%2BzdL0uD0KUEm8IxzYjFtsctIn%2Bnr5RMc14mXWc'''
+    url=base64.b64decode(weixin.Htmlurl)
+    UserId=weixin.UserId
+    LabelId=weixin.LabelId
+    # url = '''http://mp.weixin.qq.com/s?__biz=MzA4ODUzNjAxOA==&mid=420208152&idx=5&sn=5fc225209d3dbd5d8f74b405510d7b9a&scene=2&srcid=0314ZkCVNaMETykzam3Mi2Ys&from=timeline&isappinstalled=0#wechat_redirect'''
     try:
         user_agent = 'Mozilla/5.0 (Windows NT 6.1; rv:37.0) Gecko/20100101 Firefox/37.0'
         headers = {'User-Agent': user_agent}
@@ -87,35 +90,40 @@ def spider(weixin):
         # print response.read()
         html = response.read().decode("utf-8")
         # print html
-        myItems = re.findall('<h2 class="rich_media_title" id="activity-name">(.*?)</h2>', html, re.S)
-        title = myItems[0].replace("\r\n", " ").strip()
-        myItems = re.findall('<em class="rich_media_meta rich_media_meta_text">(.*?)</em>', html, re.S)
-        AuthorName=myItems[0].replace("\r\n", " ").strip()
-        Thumb = re.findall('var cover = "(.*?)";', html, re.S)
-        path=title
-        mkdir(path)
+        title = re.findall('var msg_title = "(.*?)";', html, re.S)
+        # title = myItems[0].replace("\r\n", " ").strip()
+        AuthorName = re.findall('var nickname = "(.*?)";', html, re.S)
+        # if len(myItems1)!=0:
+        #    AuthorName=myItems1[0].replace("\r\n", " ").strip()
+        Thumb = re.findall('var msg_cdn_url = "(.*?)";', html, re.S)
+        # path=title
+        # mkdir(path)
         content=re.findall('<div class="rich_media_content " id="js_content">(.*?)</div>', html, re.S)
         htmlcontent=content[0].strip()
-        myItems = re.findall('<img.*?data-src="(.*?)".*?/>', content[0], re.S)
-        imgUrl=saveImgs(myItems,str(uuid.uuid1()))
-        for imageURL in myItems:
+        myItems2 = re.findall('<img.*?src="(.*?)".*?/>', content[0], re.S)
+        imgUrl=saveImgs(myItems2,str(uuid.uuid1()))
+        for imageURL in myItems2:
             htmlcontent=htmlcontent.replace(imageURL,"http://"+imgUrl[imageURL])
         # saveHtml(htmlcontent,title)
-        imgUrl=saveImgs(Thumb,str(uuid.uuid1()))
-        Thumb=imgUrl[Thumb[0]]
+        htmlcontent=htmlcontent.replace("data-src","src")
+        if len(Thumb)!=0:
+            imgUrl=saveImgs(Thumb,str(uuid.uuid1()))
+            Thumb=imgUrl[Thumb[0]]
         postDict={
-            'uploaderId':"1",
+            'uploaderId':UserId,
             "Thumb":Thumb,
-            "AuthorName":AuthorName,
-            "AuthorId":"测试",
-            "HtmlBody":htmlcontent
+            "AuthorName":AuthorName.encode('utf-8'),
+            "AuthorId":title.encode('utf-8'),
+            "HtmlBody":htmlcontent,
+            "LabelId":LabelId
         }
         encodedjson = json.dumps(postDict)
         # postData = urllib.urlencode(postDict)
-        request = urllib2.Request("http://192.168.50.131:1114/api/UGCNewsLinkApi/ReceiveNewsBody", encodedjson)
+        request = urllib2.Request("http://localhost:10451/api/UGCNewsLinkApi/ReceiveNewsBody", encodedjson)
         request.add_header('Content-Type', "application/json")
         response = urllib2.urlopen(request)
         html = response.read().decode("utf-8")
+        print html
         # download=u'static/' + path + u'.zip'
         # Zfile.careate(download,path)#生成压缩包
         # shutil.rmtree(path)#删除目录

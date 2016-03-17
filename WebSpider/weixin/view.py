@@ -15,10 +15,21 @@ def home(request):
             weixin=WeiXin()
             weixin.Htmlurl=form.cleaned_data['Htmlurl']
             spider(weixin)
-            weixin.save()
-            return HttpResponseRedirect(weixin.Downloadurl)
+            # weixin.save()
+            return HttpResponse(u'爬取成功！')
         else:
             return HttpResponse(u'爬取失败请联系管理员！')
     else:
-        form=WeiXinForm()
-        return render_to_response('weixin.html',{'form':form},context_instance=RequestContext(request))
+        form=WeiXinForm(request.GET)
+        # return render_to_response('weixin.html',{'form':form},context_instance=RequestContext(request))
+        if form.is_valid():
+            weixin=WeiXin()
+            weixin.Htmlurl=form.cleaned_data['Htmlurl']
+            weixin.UserId=form.cleaned_data['UserId']
+            weixin.LabelId=form.cleaned_data['LabelId']
+            spider(weixin)
+            weixin.save()
+            return HttpResponse(u'爬取成功！')
+        else:
+            return HttpResponse(u'爬取失败请联系管理员！')
+
